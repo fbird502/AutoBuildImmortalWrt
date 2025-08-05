@@ -1,11 +1,14 @@
 #!/bin/bash
+# Log file for debugging
 source shell/custom-packages.sh
 echo "第三方软件包: $CUSTOM_PACKAGES"
+LOGFILE="/tmp/uci-defaults-log.txt"
+echo "Starting 99-custom.sh at $(date)" >> $LOGFILE
 # yml 传入的路由器型号 PROFILE
 echo "Building for profile: $PROFILE"
-echo "Include Docker: $INCLUDE_DOCKER"
 # yml 传入的固件大小 ROOTFS_PARTSIZE
-echo "Building for ROOTFS_PARTSIZE: $ROOTSIZE"
+echo "Building for ROOTFS_PARTSIZE: $ROOTFS_PARTSIZE"
+
 if [ -z "$CUSTOM_PACKAGES" ]; then
   echo "⚪️ 未选择 任何第三方软件包"
 else
@@ -28,18 +31,18 @@ else
   arch aarch64_cortex-a53 15' repositories.conf
 fi
 
-
 # 输出调试信息
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
+echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始构建arm64的rootfs.tar.gz"
 
 
-# 定义所需安装的包列表 23.05.4
+# 定义所需安装的包列表 下列插件你都可以自行删减
 PACKAGES=""
-PACKAGES="$PACKAGES curl"
+PACKAGES="$PACKAGES curl fdisk"
 PACKAGES="$PACKAGES luci-i18n-diskman-zh-cn"
-PACKAGES="$PACKAGES luci-i18n-opkg-zh-cn"
+PACKAGES="$PACKAGES luci-i18n-package-manager-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
-PACKAGES="$PACKAGES luci-i18n-filebrowser-zh-cn"
+# 服务——FileBrowser 用户名admin 密码admin
+PACKAGES="$PACKAGES luci-i18n-filebrowser-go-zh-cn"
 PACKAGES="$PACKAGES luci-theme-argon"
 PACKAGES="$PACKAGES luci-app-argon-config"
 PACKAGES="$PACKAGES luci-i18n-argon-config-zh-cn"
@@ -48,15 +51,25 @@ PACKAGES="$PACKAGES luci-i18n-passwall-zh-cn"
 PACKAGES="$PACKAGES luci-app-openclash"
 PACKAGES="$PACKAGES luci-i18n-homeproxy-zh-cn"
 PACKAGES="$PACKAGES openssh-sftp-server"
-# ======== shell/custom-packages.sh =======
-# 合并imm仓库以外的第三方插件
-PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
-
+PACKAGES="$PACKAGES luci-i18n-samba4-zh-cn"
+# 文件管理器
+PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
+# 静态文件服务器dufs(推荐)
+PACKAGES="$PACKAGES luci-i18n-dufs-zh-cn"
 # 判断是否需要编译 Docker 插件
 if [ "$INCLUDE_DOCKER" = "yes" ]; then
     PACKAGES="$PACKAGES luci-i18n-dockerman-zh-cn"
-    echo "Adding package: luci-i18n-dockerman-zh-cn"
+    echo "✅ 已选择docker : luci-i18n-dockerman-zh-cn"
 fi
+# 斐讯N1 无线
+PACKAGES="$PACKAGES kmod-brcmfmac wpad-basic-mbedtls iw iwinfo"
+PACKAGES="$PACKAGES perlbase-base perlbase-file perlbase-time perlbase-utf8 perlbase-xsloader"
+# 晶晨宝盒
+PACKAGES="$PACKAGES luci-app-amlogic luci-i18n-amlogic-zh-cn"
+
+# ======== shell/custom-packages.sh =======
+# 合并imm仓库以外的第三方插件
+PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
 
 # 若构建openclash 则添加内核
 if echo "$PACKAGES" | grep -q "luci-app-openclash"; then
@@ -73,11 +86,12 @@ else
     echo "⚪️ 未选择 luci-app-openclash"
 fi
 
+
 # 构建镜像
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
 
-make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="/home/build/immortalwrt/files" ROOTFS_PARTSIZE=$ROOTSIZE
+make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="/home/build/immortalwrt/files" ROOTFS_PARTSIZE=$ROOTFS_PARTSIZE
 
 if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: Build failed!"
